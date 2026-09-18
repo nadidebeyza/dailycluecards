@@ -44,11 +44,11 @@ BRAND_NAME = os.getenv("BRAND_NAME", "dailycluecards")
 WATERMARK_TEXT = os.getenv("WATERMARK_TEXT", f"@{BRAND_NAME}")
 
 # Gemini model configuration
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 MODELS_TO_TRY = [
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
 ]
 RETRY_ON_503_MAX = 3
 RETRY_ON_503_DELAY = 45

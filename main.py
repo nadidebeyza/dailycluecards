@@ -584,14 +584,17 @@ def create_answer_image(content: ClueContent) -> Path:
     header_y = 60
     draw.text((header_x, header_y), header_text, font=font_header, fill=COLOR_TEXT)
     
-    # Answer badge (red background)
+    # Answer badge (red background) - precise centering
     answer_text = content.word.upper()
-    answer_w, answer_h = _get_text_bbox(draw, answer_text, font_answer)
+    bbox = draw.textbbox((0, 0), answer_text, font=font_answer)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    text_offset_y = bbox[1]
     
     badge_padding_x = 100
-    badge_padding_y = 50
-    badge_width = answer_w + badge_padding_x * 2
-    badge_height = answer_h + badge_padding_y * 2
+    badge_padding_y = 40
+    badge_width = text_width + badge_padding_x * 2
+    badge_height = text_height + badge_padding_y * 2
     badge_x = (CANVAS_WIDTH - badge_width) // 2
     badge_y = 200
     
@@ -602,9 +605,9 @@ def create_answer_image(content: ClueContent) -> Path:
         fill=COLOR_RED,
     )
     
-    # Answer text (white on red, centered in badge)
-    answer_x = badge_x + (badge_width - answer_w) // 2
-    answer_y = badge_y + (badge_height - answer_h) // 2
+    # Answer text (white on red, precisely centered in badge)
+    answer_x = badge_x + (badge_width - text_width) // 2
+    answer_y = badge_y + badge_padding_y - text_offset_y
     draw.text((answer_x, answer_y), answer_text, font=font_answer, fill=COLOR_WHITE)
     
     # Subtext: "Did you get it right?"
@@ -621,20 +624,20 @@ def create_answer_image(content: ClueContent) -> Path:
     follow_y = 500
     draw.text((follow_x, follow_y), follow_text, font=font_subtext, fill=COLOR_YELLOW)
     
-    # Add mascot image at bottom (full width with padding)
+    # Add mascot image at bottom (smaller size for answer image)
     if MASCOT_IMAGE.exists():
         mascot = Image.open(MASCOT_IMAGE)
         if mascot.mode != "RGBA":
             mascot = mascot.convert("RGBA")
         
-        side_padding = 40
+        side_padding = 250
         target_width = CANVAS_WIDTH - (side_padding * 2)
         aspect_ratio = mascot.height / mascot.width
         target_height = int(target_width * aspect_ratio)
         
         mascot = mascot.resize((target_width, target_height), Image.Resampling.LANCZOS)
         
-        mascot_x = side_padding
+        mascot_x = (CANVAS_WIDTH - target_width) // 2
         mascot_y = CANVAS_HEIGHT - target_height - 20
         
         canvas.paste(mascot, (mascot_x, mascot_y), mascot)

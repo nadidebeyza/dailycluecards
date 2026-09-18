@@ -493,8 +493,8 @@ def create_clue_image(content: ClueContent) -> Path:
     
     # Clue options at top
     badge_height = 100
-    badge_start_y = 180
-    badge_spacing = 120
+    badge_start_y = 80
+    badge_spacing = 110
     
     for i, clue in enumerate(content.clues):
         badge_y = badge_start_y + (i * badge_spacing)
@@ -504,18 +504,18 @@ def create_clue_image(content: ClueContent) -> Path:
         clue_y = badge_y + (badge_height - clue_h) // 2
         draw.text((clue_x, clue_y), numbered_clue, font=font_clue_yeseva, fill=(0, 0, 0))
     
-    # Title below options (equal spacing)
+    # Title below options (with spacing)
     header_text = "Guess The Word!"
     header_w, header_h = _get_text_bbox(draw, header_text, font_header)
     header_x = (CANVAS_WIDTH - header_w) // 2
-    header_y = badge_start_y + (3 * badge_spacing)
+    header_y = badge_start_y + (3 * badge_spacing) + 50
     draw.text((header_x, header_y), header_text, font=font_header, fill=COLOR_RED)
     
-    # Swipe instruction below title (equal spacing)
+    # Swipe instruction below title (more spacing)
     instruction_text = "Swipe to see the answer >>"
     inst_w, inst_h = _get_text_bbox(draw, instruction_text, font_instruction_yeseva)
     inst_x = (CANVAS_WIDTH - inst_w) // 2
-    inst_y = header_y + badge_spacing
+    inst_y = header_y + 200
     draw.text((inst_x, inst_y), instruction_text, font=font_instruction_yeseva, fill=(0, 0, 0))
     
     # Add mascot image at bottom (smaller size)

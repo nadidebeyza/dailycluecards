@@ -742,7 +742,9 @@ def _graph_request(
     else:
         raise ValueError(f"Unsupported method: {method}")
     
-    response.raise_for_status()
+    if not response.ok:
+        logger.error("API error %d: %s", response.status_code, response.text)
+        response.raise_for_status()
     return response.json()
 
 

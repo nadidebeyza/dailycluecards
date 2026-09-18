@@ -612,22 +612,41 @@ def upload_to_github_pages(image_path: Path, filename_prefix: str = "post") -> s
     unique_filename = f"{filename_prefix}_{timestamp}.jpg"
     
     original_branch = os.getenv("GITHUB_REF_NAME", "main")
-    original_dir = Path.cwd()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_image = Path(tmpdir) / unique_filename
         shutil.copy2(image_path, temp_image)
         
         try:
-            # Fetch and checkout gh-pages
-            subprocess.run(
+            # Try to fetch gh-pages branch
+            fetch_result = subprocess.run(
                 ["git", "fetch", "origin", "gh-pages"],
-                check=False, capture_output=True
+                capture_output=True
             )
-            subprocess.run(
+            
+            # Check if gh-pages exists remotely
+            checkout_result = subprocess.run(
                 ["git", "checkout", "gh-pages"],
-                check=True, capture_output=True
+                capture_output=True
             )
+            
+            if checkout_result.returncode != 0:
+                # gh-pages doesn't exist, create orphan branch
+                logger.info("Creating new gh-pages branch...")
+                subprocess.run(
+                    ["git", "checkout", "--orphan", "gh-pages"],
+                    check=True, capture_output=True
+                )
+                # Remove all files from staging
+                subprocess.run(
+                    ["git", "rm", "-rf", "."],
+                    capture_output=True
+                )
+                # Create a simple index.html
+                Path("index.html").write_text(
+                    "<html><body><h1>Daily Clue Cards Images</h1></body></html>\n"
+                )
+                subprocess.run(["git", "add", "index.html"], check=True)
             
             # Copy image and commit
             shutil.copy2(temp_image, Path(unique_filename))

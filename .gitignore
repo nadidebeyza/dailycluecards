@@ -31,10 +31,14 @@ ENV/
 env/
 .venv/
 
-# Generated images (committed separately to gh-pages)
+# Generated images (committed to images/ folder)
 final_clue.jpg
 final_answer.jpg
-static_story.jpg
+story_clue.jpg
+story_answer.jpg
+
+# Preview images (local testing only)
+preview_*.jpg
 
 # IDE
 .idea/

@@ -2,8 +2,8 @@
 """
 Daily Clue Cards - Static Story Pipeline
 
-Publishes a static promotional story to Instagram.
-The story is always the same teaser image - no AI generation needed.
+Publishes static promotional stories (clue + answer) to Instagram.
+Uses a fixed example game - no AI generation needed.
 """
 
 from __future__ import annotations
@@ -17,19 +17,13 @@ from main import (
     host_image,
     publish_story_to_instagram,
     logger,
-    CANVAS_WIDTH,
-    CANVAS_HEIGHT,
     COLOR_WHITE,
     COLOR_RED,
-    COLOR_YELLOW,
-    COLOR_TEXT,
-    COLOR_LIGHT_GRAY,
-    WATERMARK_TEXT,
-    _load_font,
-    _draw_rounded_rect,
+    YESEVA_FONT,
+    MASCOT_IMAGE,
     _get_text_bbox,
 )
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 # ---------------------------------------------------------------------------
 # Story Configuration
@@ -37,146 +31,151 @@ from PIL import Image, ImageDraw
 
 STORY_WIDTH = 1080
 STORY_HEIGHT = 1920  # 9:16 aspect ratio for stories
-STATIC_STORY_PATH = Path("static_story.jpg")
+STORY_CLUE_PATH = Path("story_clue.jpg")
+STORY_ANSWER_PATH = Path("story_answer.jpg")
+
+# Example game for story (different from daily post)
+STORY_CLUES = ["Night", "Crater", "Tide"]
+STORY_ANSWER = "Moon"
+
+COLOR_BLACK = (0, 0, 0)
 
 # ---------------------------------------------------------------------------
 # Static Story Generation
 # ---------------------------------------------------------------------------
 
-def create_static_story() -> Path:
-    """Create the static promotional story image."""
+def create_story_clue() -> Path:
+    """Create the story clue image (slide 1)."""
     canvas = Image.new("RGB", (STORY_WIDTH, STORY_HEIGHT), COLOR_WHITE)
     draw = ImageDraw.Draw(canvas)
     
-    # Load fonts
-    font_title = _load_font(64, bold=True)
-    font_subtitle = _load_font(48, bold=True)
-    font_clue = _load_font(40, bold=True)
-    font_small = _load_font(32)
-    font_watermark = _load_font(28)
+    # Load Yeseva One fonts
+    if YESEVA_FONT.exists():
+        font_header = ImageFont.truetype(str(YESEVA_FONT), 100)
+        font_clue = ImageFont.truetype(str(YESEVA_FONT), 75)
+        font_instruction = ImageFont.truetype(str(YESEVA_FONT), 36)
+        font_cta = ImageFont.truetype(str(YESEVA_FONT), 50)
+    else:
+        raise RuntimeError("Yeseva One font not found")
     
-    # Title: "DAILY CLUE CARDS"
-    title_text = "DAILY CLUE CARDS"
-    title_w, title_h = _get_text_bbox(draw, title_text, font_title)
-    title_x = (STORY_WIDTH - title_w) // 2
-    title_y = 200
-    draw.text((title_x, title_y), title_text, font=font_title, fill=COLOR_RED)
+    # Header: "Guess The Word!"
+    header_text = "Guess The Word!"
+    header_w, header_h = _get_text_bbox(draw, header_text, font_header)
+    draw.text(((STORY_WIDTH - header_w) // 2, 180), header_text, font=font_header, fill=COLOR_RED)
     
-    # Subtitle: "Can you guess the word?"
-    subtitle_text = "Can you guess the word?"
-    sub_w, sub_h = _get_text_bbox(draw, subtitle_text, font_subtitle)
-    sub_x = (STORY_WIDTH - sub_w) // 2
-    sub_y = 300
-    draw.text((sub_x, sub_y), subtitle_text, font=font_subtitle, fill=COLOR_TEXT)
+    # Clues
+    badge_height = 100
+    badge_start_y = 350
+    badge_spacing = 110
     
-    # Sample card preview
-    card_width = 800
-    card_height = 700
-    card_x = (STORY_WIDTH - card_width) // 2
-    card_y = 480
-    
-    # Card background (light shadow effect)
-    shadow_offset = 8
-    draw.rounded_rectangle(
-        (card_x + shadow_offset, card_y + shadow_offset, 
-         card_x + card_width + shadow_offset, card_y + card_height + shadow_offset),
-        radius=20,
-        fill=(230, 230, 230),
-    )
-    draw.rounded_rectangle(
-        (card_x, card_y, card_x + card_width, card_y + card_height),
-        radius=20,
-        fill=COLOR_WHITE,
-        outline=COLOR_LIGHT_GRAY,
-        width=2,
-    )
-    
-    # Card header
-    card_header = "GUESS THE WORD!"
-    header_w, header_h = _get_text_bbox(draw, card_header, font_subtitle)
-    header_x = card_x + (card_width - header_w) // 2
-    header_y = card_y + 50
-    draw.text((header_x, header_y), card_header, font=font_subtitle, fill=COLOR_RED)
-    
-    # Sample clue badges
-    badge_width = 500
-    badge_height = 70
-    badge_x = card_x + (card_width - badge_width) // 2
-    sample_clues = ["CLUE 1", "CLUE 2", "CLUE 3"]
-    badge_start_y = card_y + 180
-    badge_spacing = 100
-    
-    for i, clue in enumerate(sample_clues):
+    for i, clue in enumerate(STORY_CLUES):
         badge_y = badge_start_y + (i * badge_spacing)
-        
-        _draw_rounded_rect(
-            draw,
-            (badge_x, badge_y, badge_x + badge_width, badge_y + badge_height),
-            radius=15,
-            fill=COLOR_YELLOW,
-        )
-        
-        clue_w, clue_h = _get_text_bbox(draw, clue, font_clue)
-        clue_x = badge_x + (badge_width - clue_w) // 2
+        numbered_clue = f"{i + 1}. {clue}"
+        clue_w, clue_h = _get_text_bbox(draw, numbered_clue, font_clue)
+        clue_x = (STORY_WIDTH - clue_w) // 2
         clue_y = badge_y + (badge_height - clue_h) // 2
-        draw.text((clue_x, clue_y), clue, font=font_clue, fill=COLOR_TEXT)
+        draw.text((clue_x, clue_y), numbered_clue, font=font_clue, fill=COLOR_BLACK)
     
-    # "?" in a circle
-    question_y = card_y + card_height - 130
-    question_size = 80
-    question_x = card_x + (card_width - question_size) // 2
-    draw.ellipse(
-        (question_x, question_y, question_x + question_size, question_y + question_size),
-        fill=COLOR_RED,
-    )
-    q_font = _load_font(48, bold=True)
-    q_w, q_h = _get_text_bbox(draw, "?", q_font)
-    draw.text(
-        (question_x + (question_size - q_w) // 2, question_y + (question_size - q_h) // 2 - 3),
-        "?",
-        font=q_font,
-        fill=COLOR_WHITE,
-    )
+    # Instruction
+    inst_text = "Touch to see the answer >>"
+    inst_w, inst_h = _get_text_bbox(draw, inst_text, font_instruction)
+    draw.text(((STORY_WIDTH - inst_w) // 2, badge_start_y + (3 * badge_spacing) + 80), inst_text, font=font_instruction, fill=COLOR_BLACK)
     
-    # Call to action
-    cta_text = "Play Every Day!"
-    cta_w, cta_h = _get_text_bbox(draw, cta_text, font_subtitle)
-    cta_x = (STORY_WIDTH - cta_w) // 2
-    cta_y = 1300
-    draw.text((cta_x, cta_y), cta_text, font=font_subtitle, fill=COLOR_RED)
+    # Mascot
+    if MASCOT_IMAGE.exists():
+        mascot = Image.open(MASCOT_IMAGE).convert("RGBA")
+        side_padding = 200
+        target_width = STORY_WIDTH - (side_padding * 2)
+        target_height = int(target_width * mascot.height / mascot.width)
+        mascot = mascot.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        mascot_x = (STORY_WIDTH - target_width) // 2
+        mascot_y = 900
+        canvas.paste(mascot, (mascot_x, mascot_y), mascot)
     
-    # Arrow down
-    arrow_text = "↓"
-    arrow_font = _load_font(60)
-    arrow_w, arrow_h = _get_text_bbox(draw, arrow_text, arrow_font)
-    arrow_x = (STORY_WIDTH - arrow_w) // 2
-    arrow_y = 1400
-    draw.text((arrow_x, arrow_y), arrow_text, font=arrow_font, fill=COLOR_YELLOW)
+    # CTA at bottom
+    cta_text = "Check Our Posts!"
+    cta_w, cta_h = _get_text_bbox(draw, cta_text, font_cta)
+    draw.text(((STORY_WIDTH - cta_w) // 2, 1700), cta_text, font=font_cta, fill=COLOR_RED)
     
-    # "Check our posts!"
-    posts_text = "Check our posts!"
-    posts_w, posts_h = _get_text_bbox(draw, posts_text, font_small)
-    posts_x = (STORY_WIDTH - posts_w) // 2
-    posts_y = 1500
-    draw.text((posts_x, posts_y), posts_text, font=font_small, fill=COLOR_TEXT)
-    
-    # Watermark
-    wm_w, wm_h = _get_text_bbox(draw, WATERMARK_TEXT, font_watermark)
-    wm_x = (STORY_WIDTH - wm_w) // 2
-    wm_y = STORY_HEIGHT - 150
-    draw.text((wm_x, wm_y), WATERMARK_TEXT, font=font_watermark, fill=COLOR_LIGHT_GRAY)
-    
-    canvas.save(STATIC_STORY_PATH, format="JPEG", quality=95, optimize=True)
-    logger.info("Created static story image: %s", STATIC_STORY_PATH)
-    return STATIC_STORY_PATH
+    canvas.save(STORY_CLUE_PATH, format="JPEG", quality=95, optimize=True)
+    logger.info("Created story clue image: %s", STORY_CLUE_PATH)
+    return STORY_CLUE_PATH
 
 
-def ensure_static_story_exists() -> Path:
-    """Ensure the static story image exists, create if needed."""
-    if not STATIC_STORY_PATH.exists():
-        logger.info("Static story not found, creating...")
-        return create_static_story()
-    return STATIC_STORY_PATH
+def create_story_answer() -> Path:
+    """Create the story answer image (slide 2)."""
+    canvas = Image.new("RGB", (STORY_WIDTH, STORY_HEIGHT), COLOR_WHITE)
+    draw = ImageDraw.Draw(canvas)
+    
+    # Load Yeseva One fonts
+    if YESEVA_FONT.exists():
+        font_header = ImageFont.truetype(str(YESEVA_FONT), 90)
+        font_answer = ImageFont.truetype(str(YESEVA_FONT), 120)
+        font_subtext = ImageFont.truetype(str(YESEVA_FONT), 45)
+        font_cta = ImageFont.truetype(str(YESEVA_FONT), 50)
+    else:
+        raise RuntimeError("Yeseva One font not found")
+    
+    # Header
+    header_text = "The Answer Is..."
+    header_w, header_h = _get_text_bbox(draw, header_text, font_header)
+    draw.text(((STORY_WIDTH - header_w) // 2, 200), header_text, font=font_header, fill=COLOR_RED)
+    
+    # Answer in red rectangle
+    bbox = draw.textbbox((0, 0), STORY_ANSWER, font=font_answer)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    text_offset_y = bbox[1]
+    
+    rect_padding_x = 60
+    rect_padding_y = 40
+    rect_width = text_width + rect_padding_x * 2
+    rect_height = text_height + rect_padding_y * 2
+    rect_x = (STORY_WIDTH - rect_width) // 2
+    rect_y = 380
+    
+    draw.rounded_rectangle(
+        (rect_x, rect_y, rect_x + rect_width, rect_y + rect_height),
+        radius=20,
+        fill=COLOR_RED
+    )
+    
+    # Center answer text precisely
+    answer_x = rect_x + (rect_width - text_width) // 2
+    answer_y = rect_y + rect_padding_y - text_offset_y
+    draw.text((answer_x, answer_y), STORY_ANSWER, font=font_answer, fill=COLOR_WHITE)
+    
+    # Subtext
+    subtext = "Follow for more!"
+    sub_w, sub_h = _get_text_bbox(draw, subtext, font_subtext)
+    draw.text(((STORY_WIDTH - sub_w) // 2, rect_y + rect_height + 80), subtext, font=font_subtext, fill=COLOR_BLACK)
+    
+    # Mascot
+    if MASCOT_IMAGE.exists():
+        mascot = Image.open(MASCOT_IMAGE).convert("RGBA")
+        side_padding = 200
+        target_width = STORY_WIDTH - (side_padding * 2)
+        target_height = int(target_width * mascot.height / mascot.width)
+        mascot = mascot.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        mascot_x = (STORY_WIDTH - target_width) // 2
+        mascot_y = 900
+        canvas.paste(mascot, (mascot_x, mascot_y), mascot)
+    
+    # CTA at bottom
+    cta_text = "Check Our Posts!"
+    cta_w, cta_h = _get_text_bbox(draw, cta_text, font_cta)
+    draw.text(((STORY_WIDTH - cta_w) // 2, 1700), cta_text, font=font_cta, fill=COLOR_RED)
+    
+    canvas.save(STORY_ANSWER_PATH, format="JPEG", quality=95, optimize=True)
+    logger.info("Created story answer image: %s", STORY_ANSWER_PATH)
+    return STORY_ANSWER_PATH
+
+
+def create_story_images() -> tuple[Path, Path]:
+    """Create both story images."""
+    clue_path = create_story_clue()
+    answer_path = create_story_answer()
+    return clue_path, answer_path
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +183,7 @@ def ensure_static_story_exists() -> Path:
 # ---------------------------------------------------------------------------
 
 def run_story_pipeline() -> None:
-    """Execute the static story pipeline."""
+    """Execute the story pipeline - publishes 2 stories (clue + answer)."""
     logger.info("=" * 60)
     logger.info("Starting Daily Clue Cards Story Pipeline")
     logger.info("=" * 60)
@@ -192,19 +191,25 @@ def run_story_pipeline() -> None:
     # Validate environment
     validate_env()
     
-    # Ensure static story exists
-    story_path = ensure_static_story_exists()
+    # Create story images
+    clue_path, answer_path = create_story_images()
     
-    # Host image
-    logger.info("Uploading story to GitHub Pages...")
-    story_url = host_image(story_path, "story")
+    # Host and publish clue story
+    logger.info("Uploading clue story...")
+    clue_url = host_image(clue_path, "story_clue")
+    logger.info("Publishing clue story to Instagram...")
+    clue_media_id = publish_story_to_instagram(clue_url)
+    logger.info("Clue story published! Media ID: %s", clue_media_id)
     
-    # Publish story
-    logger.info("Publishing story to Instagram...")
-    media_id = publish_story_to_instagram(story_url)
+    # Host and publish answer story
+    logger.info("Uploading answer story...")
+    answer_url = host_image(answer_path, "story_answer")
+    logger.info("Publishing answer story to Instagram...")
+    answer_media_id = publish_story_to_instagram(answer_url)
+    logger.info("Answer story published! Media ID: %s", answer_media_id)
     
     logger.info("=" * 60)
-    logger.info("Story pipeline complete! Media ID: %s", media_id)
+    logger.info("Story pipeline complete!")
     logger.info("=" * 60)
 
 
@@ -212,8 +217,8 @@ def main() -> None:
     """CLI entry point."""
     if len(sys.argv) > 1:
         if sys.argv[1] == "--generate-only":
-            create_static_story()
-            print(f"Created: {STATIC_STORY_PATH}")
+            clue_path, answer_path = create_story_images()
+            print(f"Created: {clue_path}, {answer_path}")
             return
     
     run_story_pipeline()

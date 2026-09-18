@@ -65,19 +65,21 @@ CANVAS_HEIGHT = 1350  # 4:5 aspect ratio for feed
 # Output paths
 OUTPUT_CLUE_IMAGE = Path("final_clue.jpg")
 OUTPUT_ANSWER_IMAGE = Path("final_answer.jpg")
+MASCOT_IMAGE = Path("daily-clue.png")
+YESEVA_FONT = Path("YesevaOne-Regular.ttf")
 
 # Design colors (RGB)
 COLOR_WHITE = (255, 255, 255)
-COLOR_RED = (230, 57, 70)       # #E63946
+COLOR_RED = (184, 27, 27)       # #b81b1b
 COLOR_YELLOW = (255, 209, 102)  # #FFD166
 COLOR_TEXT = (43, 45, 66)       # #2B2D42
 COLOR_LIGHT_GRAY = (200, 200, 200)
 
 # Typography sizes
-HEADER_FONT_SIZE = 72
-CLUE_FONT_SIZE = 48
+HEADER_FONT_SIZE = 110
+CLUE_FONT_SIZE = 85
 ANSWER_FONT_SIZE = 80
-INSTRUCTION_FONT_SIZE = 32
+INSTRUCTION_FONT_SIZE = 40
 WATERMARK_FONT_SIZE = 28
 
 # Instagram API
@@ -476,55 +478,84 @@ def create_clue_image(content: ClueContent) -> Path:
     draw = ImageDraw.Draw(canvas)
     
     # Load fonts
-    font_header = _load_font(HEADER_FONT_SIZE, bold=True)
     font_clue = _load_font(CLUE_FONT_SIZE, bold=True)
     font_instruction = _load_font(INSTRUCTION_FONT_SIZE)
-    font_watermark = _load_font(WATERMARK_FONT_SIZE)
     
-    # Header: "GUESS THE WORD!"
-    header_text = "GUESS THE WORD!"
+    # Load Yeseva One font for header
+    if YESEVA_FONT.exists():
+        font_header = ImageFont.truetype(str(YESEVA_FONT), HEADER_FONT_SIZE)
+    else:
+        font_header = _load_font(HEADER_FONT_SIZE, bold=True)
+    
+    # Header: "Guess The Word!" at top
+    header_text = "Guess The Word!"
     header_w, header_h = _get_text_bbox(draw, header_text, font_header)
     header_x = (CANVAS_WIDTH - header_w) // 2
-    header_y = 180
+    header_y = 40
     draw.text((header_x, header_y), header_text, font=font_header, fill=COLOR_RED)
     
-    # Clue badges
-    badge_width = 700
+    # Clue badges - centered
     badge_height = 100
     badge_radius = 20
-    badge_x = (CANVAS_WIDTH - badge_width) // 2
-    badge_start_y = 420
-    badge_spacing = 140
+    badge_start_y = 190
+    badge_spacing = 120
+    badge_padding_x = 40
+    
+    # Load Yeseva One font for clues
+    if YESEVA_FONT.exists():
+        font_clue_yeseva = ImageFont.truetype(str(YESEVA_FONT), CLUE_FONT_SIZE)
+    else:
+        font_clue_yeseva = font_clue
     
     for i, clue in enumerate(content.clues):
         badge_y = badge_start_y + (i * badge_spacing)
         
-        # Draw yellow badge
-        _draw_rounded_rect(
-            draw,
-            (badge_x, badge_y, badge_x + badge_width, badge_y + badge_height),
-            radius=badge_radius,
-            fill=COLOR_YELLOW,
-        )
+        # Add number prefix with title case
+        numbered_clue = f"{i + 1}. {clue.title()}"
         
-        # Draw clue text centered in badge
-        clue_w, clue_h = _get_text_bbox(draw, clue, font_clue)
-        clue_x = badge_x + (badge_width - clue_w) // 2
+        # Calculate text dimensions
+        clue_w, clue_h = _get_text_bbox(draw, numbered_clue, font_clue_yeseva)
+        
+        # Center the text (no background)
+        clue_x = (CANVAS_WIDTH - clue_w) // 2
         clue_y = badge_y + (badge_height - clue_h) // 2
-        draw.text((clue_x, clue_y), clue, font=font_clue, fill=COLOR_TEXT)
+        
+        # Draw clue text (black, Yeseva One, no background)
+        draw.text((clue_x, clue_y), numbered_clue, font=font_clue_yeseva, fill=(0, 0, 0))
     
-    # Instruction: "Swipe to see the answer →"
-    instruction_text = "Swipe to see the answer →"
-    inst_w, inst_h = _get_text_bbox(draw, instruction_text, font_instruction)
+    # Instruction below clues (centered, black, Yeseva One)
+    if YESEVA_FONT.exists():
+        font_instruction_yeseva = ImageFont.truetype(str(YESEVA_FONT), INSTRUCTION_FONT_SIZE)
+    else:
+        font_instruction_yeseva = font_instruction
+    instruction_text = "Swipe to see the answer >>"
+    inst_w, inst_h = _get_text_bbox(draw, instruction_text, font_instruction_yeseva)
     inst_x = (CANVAS_WIDTH - inst_w) // 2
-    inst_y = 1050
-    draw.text((inst_x, inst_y), instruction_text, font=font_instruction, fill=COLOR_LIGHT_GRAY)
+    inst_y = badge_start_y + (3 * badge_spacing) + 100
+    draw.text((inst_x, inst_y), instruction_text, font=font_instruction_yeseva, fill=(0, 0, 0))
     
-    # Watermark
-    wm_w, wm_h = _get_text_bbox(draw, WATERMARK_TEXT, font_watermark)
-    wm_x = (CANVAS_WIDTH - wm_w) // 2
-    wm_y = CANVAS_HEIGHT - 100
-    draw.text((wm_x, wm_y), WATERMARK_TEXT, font=font_watermark, fill=COLOR_LIGHT_GRAY)
+    # Add mascot image at bottom (smaller size for clue image)
+    if MASCOT_IMAGE.exists():
+        mascot = Image.open(MASCOT_IMAGE)
+        # Convert to RGBA if needed
+        if mascot.mode != "RGBA":
+            mascot = mascot.convert("RGBA")
+        
+        # Calculate size: more padding for smaller mascot on clue image
+        side_padding = 250
+        target_width = CANVAS_WIDTH - (side_padding * 2)
+        aspect_ratio = mascot.height / mascot.width
+        target_height = int(target_width * aspect_ratio)
+        
+        # Resize mascot
+        mascot = mascot.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        
+        # Position at bottom center
+        mascot_x = side_padding
+        mascot_y = CANVAS_HEIGHT - target_height - 20  # 20px from bottom
+        
+        # Paste with transparency
+        canvas.paste(mascot, (mascot_x, mascot_y), mascot)
     
     canvas.save(OUTPUT_CLUE_IMAGE, format="JPEG", quality=95, optimize=True)
     logger.info("Created clue image: %s", OUTPUT_CLUE_IMAGE)
@@ -536,17 +567,21 @@ def create_answer_image(content: ClueContent) -> Path:
     canvas = Image.new("RGB", (CANVAS_WIDTH, CANVAS_HEIGHT), COLOR_WHITE)
     draw = ImageDraw.Draw(canvas)
     
-    # Load fonts
-    font_header = _load_font(HEADER_FONT_SIZE, bold=True)
-    font_answer = _load_font(ANSWER_FONT_SIZE, bold=True)
-    font_subtext = _load_font(INSTRUCTION_FONT_SIZE)
-    font_watermark = _load_font(WATERMARK_FONT_SIZE)
+    # Load Yeseva One fonts (larger sizes for answer image)
+    if YESEVA_FONT.exists():
+        font_header = ImageFont.truetype(str(YESEVA_FONT), 90)
+        font_answer = ImageFont.truetype(str(YESEVA_FONT), 100)
+        font_subtext = ImageFont.truetype(str(YESEVA_FONT), 42)
+    else:
+        font_header = _load_font(90, bold=True)
+        font_answer = _load_font(100, bold=True)
+        font_subtext = _load_font(42)
     
-    # Header: "THE ANSWER IS..."
-    header_text = "THE ANSWER IS..."
+    # Header: "The Answer Is..."
+    header_text = "The Answer Is..."
     header_w, header_h = _get_text_bbox(draw, header_text, font_header)
     header_x = (CANVAS_WIDTH - header_w) // 2
-    header_y = 280
+    header_y = 60
     draw.text((header_x, header_y), header_text, font=font_header, fill=COLOR_TEXT)
     
     # Answer badge (red background)
@@ -558,7 +593,7 @@ def create_answer_image(content: ClueContent) -> Path:
     badge_width = answer_w + badge_padding_x * 2
     badge_height = answer_h + badge_padding_y * 2
     badge_x = (CANVAS_WIDTH - badge_width) // 2
-    badge_y = 520
+    badge_y = 200
     
     _draw_rounded_rect(
         draw,
@@ -567,30 +602,42 @@ def create_answer_image(content: ClueContent) -> Path:
         fill=COLOR_RED,
     )
     
-    # Answer text (white on red)
-    answer_x = badge_x + badge_padding_x
-    answer_y = badge_y + badge_padding_y
+    # Answer text (white on red, centered in badge)
+    answer_x = badge_x + (badge_width - answer_w) // 2
+    answer_y = badge_y + (badge_height - answer_h) // 2
     draw.text((answer_x, answer_y), answer_text, font=font_answer, fill=COLOR_WHITE)
     
     # Subtext: "Did you get it right?"
     subtext = "Did you get it right?"
     sub_w, sub_h = _get_text_bbox(draw, subtext, font_subtext)
     sub_x = (CANVAS_WIDTH - sub_w) // 2
-    sub_y = 850
+    sub_y = 430
     draw.text((sub_x, sub_y), subtext, font=font_subtext, fill=COLOR_TEXT)
     
     # Follow prompt
     follow_text = "Follow for daily clues!"
     follow_w, follow_h = _get_text_bbox(draw, follow_text, font_subtext)
     follow_x = (CANVAS_WIDTH - follow_w) // 2
-    follow_y = 950
+    follow_y = 500
     draw.text((follow_x, follow_y), follow_text, font=font_subtext, fill=COLOR_YELLOW)
     
-    # Watermark
-    wm_w, wm_h = _get_text_bbox(draw, WATERMARK_TEXT, font_watermark)
-    wm_x = (CANVAS_WIDTH - wm_w) // 2
-    wm_y = CANVAS_HEIGHT - 100
-    draw.text((wm_x, wm_y), WATERMARK_TEXT, font=font_watermark, fill=COLOR_LIGHT_GRAY)
+    # Add mascot image at bottom (full width with padding)
+    if MASCOT_IMAGE.exists():
+        mascot = Image.open(MASCOT_IMAGE)
+        if mascot.mode != "RGBA":
+            mascot = mascot.convert("RGBA")
+        
+        side_padding = 40
+        target_width = CANVAS_WIDTH - (side_padding * 2)
+        aspect_ratio = mascot.height / mascot.width
+        target_height = int(target_width * aspect_ratio)
+        
+        mascot = mascot.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        
+        mascot_x = side_padding
+        mascot_y = CANVAS_HEIGHT - target_height - 20
+        
+        canvas.paste(mascot, (mascot_x, mascot_y), mascot)
     
     canvas.save(OUTPUT_ANSWER_IMAGE, format="JPEG", quality=95, optimize=True)
     logger.info("Created answer image: %s", OUTPUT_ANSWER_IMAGE)

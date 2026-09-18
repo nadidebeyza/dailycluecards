@@ -601,87 +601,54 @@ def create_answer_image(content: ClueContent) -> Path:
 # GitHub Pages Image Hosting
 # ---------------------------------------------------------------------------
 
-def upload_to_github_pages(image_path: Path, filename_prefix: str = "post") -> str:
-    """Upload image to GitHub Pages and return public URL."""
+def upload_image_to_repo(image_path: Path, filename_prefix: str = "post") -> str:
+    """Upload image to images/ folder in repo and return raw GitHub URL."""
     repo_env = os.getenv("GITHUB_REPOSITORY", "")
     if not repo_env or "/" not in repo_env:
         raise RuntimeError("GITHUB_REPOSITORY not set or invalid")
     
     owner, repo_name = repo_env.split("/", 1)
+    branch = os.getenv("GITHUB_REF_NAME", "main")
     timestamp = int(datetime.now(timezone.utc).timestamp())
     unique_filename = f"{filename_prefix}_{timestamp}.jpg"
     
-    original_branch = os.getenv("GITHUB_REF_NAME", "main")
+    # Create images directory if it doesn't exist
+    images_dir = Path("images")
+    images_dir.mkdir(exist_ok=True)
     
-    with tempfile.TemporaryDirectory() as tmpdir:
-        temp_image = Path(tmpdir) / unique_filename
-        shutil.copy2(image_path, temp_image)
-        
-        try:
-            # Try to fetch gh-pages branch
-            fetch_result = subprocess.run(
-                ["git", "fetch", "origin", "gh-pages"],
-                capture_output=True
-            )
-            
-            # Check if gh-pages exists remotely
-            checkout_result = subprocess.run(
-                ["git", "checkout", "gh-pages"],
-                capture_output=True
-            )
-            
-            if checkout_result.returncode != 0:
-                # gh-pages doesn't exist, create orphan branch
-                logger.info("Creating new gh-pages branch...")
-                subprocess.run(
-                    ["git", "checkout", "--orphan", "gh-pages"],
-                    check=True, capture_output=True
-                )
-                # Remove all files from staging
-                subprocess.run(
-                    ["git", "rm", "-rf", "."],
-                    capture_output=True
-                )
-                # Create a simple index.html
-                Path("index.html").write_text(
-                    "<html><body><h1>Daily Clue Cards Images</h1></body></html>\n"
-                )
-                subprocess.run(["git", "add", "index.html"], check=True)
-            
-            # Copy image and commit
-            shutil.copy2(temp_image, Path(unique_filename))
-            subprocess.run(["git", "add", unique_filename], check=True)
-            subprocess.run(
-                ["git", "commit", "-m", f"Add {unique_filename}"],
-                check=True, capture_output=True
-            )
-            subprocess.run(
-                ["git", "push", "-f", "origin", "gh-pages"],
-                check=True, capture_output=True
-            )
-            
-            logger.info("Pushed %s to gh-pages branch", unique_filename)
-            
-        finally:
-            # Return to original branch
-            subprocess.run(
-                ["git", "checkout", original_branch],
-                check=False, capture_output=True
-            )
+    # Copy image to images folder
+    dest_path = images_dir / unique_filename
+    shutil.copy2(image_path, dest_path)
     
-    url = f"https://{owner}.github.io/{repo_name}/{unique_filename}"
+    # Git add, commit, and push
+    subprocess.run(["git", "add", str(dest_path)], check=True)
+    subprocess.run(
+        ["git", "commit", "-m", f"Add image {unique_filename}"],
+        check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "push", "origin", branch],
+        check=True, capture_output=True
+    )
     
-    # Wait for URL to become accessible
-    logger.info("Waiting for image URL to become accessible: %s", url)
-    max_wait = 600  # 10 minutes
-    check_interval = 15
+    logger.info("Pushed %s to repository", unique_filename)
+    
+    # Raw GitHub URL (works immediately, no waiting needed)
+    url = f"https://raw.githubusercontent.com/{owner}/{repo_name}/{branch}/images/{unique_filename}"
+    
+    # Brief wait for GitHub to process
+    logger.info("Waiting for raw URL to be accessible: %s", url)
+    time.sleep(5)
+    
+    # Verify URL is accessible
+    max_wait = 60
+    check_interval = 5
     elapsed = 0
     
     while elapsed < max_wait:
         try:
             response = requests.head(url, timeout=10, allow_redirects=True)
-            content_type = response.headers.get("content-type", "")
-            if response.status_code == 200 and "image" in content_type.lower():
+            if response.status_code == 200:
                 logger.info("Image URL accessible after %ds", elapsed)
                 return url
         except requests.RequestException:
@@ -689,14 +656,14 @@ def upload_to_github_pages(image_path: Path, filename_prefix: str = "post") -> s
         
         time.sleep(check_interval)
         elapsed += check_interval
-        logger.info("Waiting for GitHub Pages... (%ds/%ds)", elapsed, max_wait)
+        logger.info("Waiting for GitHub... (%ds/%ds)", elapsed, max_wait)
     
     raise RuntimeError(f"Image URL not accessible after {max_wait}s: {url}")
 
 
 def host_image(image_path: Path, prefix: str = "post") -> str:
     """Host an image and return its public URL."""
-    return upload_to_github_pages(image_path, prefix)
+    return upload_image_to_repo(image_path, prefix)
 
 
 # ---------------------------------------------------------------------------

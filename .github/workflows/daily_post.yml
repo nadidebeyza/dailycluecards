@@ -1,0 +1,130 @@
+name: Daily Clue Cards Automation
+
+on:
+  schedule:
+    # Story: Every day at UTC 11:00 (Turkey 14:00)
+    - cron: '0 11 * * *'
+    # Feed Post: Every day at UTC 17:00 (Turkey 20:00)
+    - cron: '0 17 * * *'
+  
+  workflow_dispatch:
+    inputs:
+      run_type:
+        description: 'What to run'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - post_only
+          - story_only
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dailycluecards-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  run-post:
+    name: Daily Clue Card Post
+    runs-on: ubuntu-latest
+    if: |
+      github.event.schedule == '0 17 * * *' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.run_type != 'story_only')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install system fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-dejavu fonts-liberation
+      
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install google-genai pillow requests python-dotenv
+      
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Run Daily Post Automation
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          BRAND_NAME: ${{ secrets.BRAND_NAME }}
+          WATERMARK_TEXT: ${{ secrets.WATERMARK_TEXT }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: python main.py
+      
+      - name: Commit word history
+        run: |
+          git add word_history.json || true
+          git diff --staged --quiet || git commit -m "Update word history [post]"
+          git push || true
+
+  run-story:
+    name: Daily Story
+    runs-on: ubuntu-latest
+    needs: [run-post]
+    if: |
+      always() && (
+        github.event.schedule == '0 11 * * *' ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.run_type != 'post_only')
+      )
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Pull latest changes
+        run: git pull origin ${{ github.ref_name }} || true
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install system fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-dejavu fonts-liberation
+      
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install google-genai pillow requests python-dotenv
+      
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Run Story Automation
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          BRAND_NAME: ${{ secrets.BRAND_NAME }}
+          WATERMARK_TEXT: ${{ secrets.WATERMARK_TEXT }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: python story.py
